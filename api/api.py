@@ -28,7 +28,7 @@ class Request(BaseModel):
     messages: t.List[t.Dict]
 
 def tavily_tool(query):
-    response = TavilySearchResults(max_results=5).invoke(query)  
+    response = TavilySearchResults(max_results=8).invoke(query)  
     
     if not isinstance(response, list):
         return []
@@ -39,7 +39,7 @@ def tavily_tool(query):
             item = {"url": item[0], "score": item[1]}
 
         if isinstance(item, dict) and "score" in item and "url" in item:
-            if item["score"] > 0.55:
+            if item["score"] > 0.5:
                 lst.append(item["url"])
 
     return lst
@@ -64,7 +64,7 @@ def get_web_content(url: str) -> str:
 def get_facebook_content(url, headless=True):
     """Extracts content from Facebook using Selenium."""
     options = Options()
-    options.headless = headless
+    options.add_argument("--headless=new")
     options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
