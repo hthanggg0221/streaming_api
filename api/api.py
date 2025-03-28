@@ -15,6 +15,7 @@ from pydantic import BaseModel
 import typing as t
 import logging
 import asyncio
+from concurrent.futures import ProcessPoolExecutor
 logger = logging.getLogger(__name__)
 load_dotenv()
 
@@ -23,6 +24,8 @@ llm = VertexLLM()
 
 
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
+
+executor = ProcessPoolExecutor()
 
 class Request(BaseModel):
     messages: t.List[t.Dict]
@@ -95,6 +98,18 @@ async def async_extract_info_tool(url: Annotated[str, "The URL to extract inform
         return get_facebook_content(url)
     return get_web_content(url)
 
+def extract_info_sync(url: str) -> str:
+    """Hàm đồng bộ chọn phương thức phù hợp để trích xuất nội dung."""
+    if "facebook.com" in url or "m.facebook.com" in url:
+        return get_facebook_content(url)
+    return get_web_content(url)
+
+
+async def async_extract_info_tool_multiprocess(url: str):
+    """Chạy extract_info_sync trong một process khác."""
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(executor, extract_info_sync, url)
+
 @app.post("/generate")
 def generate(request: Request):
     messages = request.messages
@@ -114,7 +129,7 @@ async def generate(request: Request):
     messages = request.messages
     query = messages[-1]['content']
     urls: list = tavily_tool(query)
-    contents = await asyncio.gather(*[async_extract_info_tool(url) for url in urls])
+    contents = await asyncio.gather(*[async_extract_info_tool_multiprocess(url) for url in urls])
     print(contents)
     prompt = INSTRUCTION_PROMPT.format(content="/n".join(contents), query=query)
     messages[-1]['content'] = prompt
